@@ -37,13 +37,13 @@ async def process_video(
         tts = gTTS(text=full_message, lang='en', slow=False)
         tts.save(audio_path)
 
-        # মূল মুভির অডিও এবং এআই ভয়েস একসাথে মিক্স করা হচ্ছে যাতে লেন্স বা সাইজ না কাটে
+        # Note: duration=first preserves the full length of the source video without cutting it short.
         ffmpeg_command = [
             "ffmpeg", "-y",
             "-i", input_path,
             "-i", audio_path,
-            "-filter_complex", "[0:a]volume=1.0[a0];[1:a]volume=0.9[a1];[a0][a1] amix=inputs=2:duration=longest:dropout_transition=2 [a]",
-            "-vf", "hflip,hue=h=12:s=1.15",
+            "-filter_complex", "[0:a]volume=1.0[a0];[1:a]volume=0.8[a1];[a0][a1] amix=inputs=2:duration=first:dropout_transition=2 [a]",
+            "-vf", "hflip,hue=h=10:s=1.1",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-pix_fmt", "yuv420p",
             "-map", "0:v:0",
