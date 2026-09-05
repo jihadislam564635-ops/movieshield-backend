@@ -33,19 +33,16 @@ async def process_video(
         with open(input_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # ১. ইউজার যে কাস্টম মেসেজ ও ওয়েবসাইট লিংক দিয়েছে, তা দিয়ে এআই ভয়েস (mp3) তৈরি করা
         full_message = f"{cta_text}. Visit {website_url} now!"
         tts = gTTS(text=full_message, lang='en', slow=False)
         tts.save(audio_path)
 
-        # ২. FFmpeg দিয়ে মূল ভিডিওর ফুল লেন্স এবং অডিও বজায় রেখে ব্যাকগ্রাউন্ডে এআই ভয়েস মিক্স করা
-        # এখানে মূল ভিডিওর অডিও ([0:a]) এবং এআই ভয়েস অডিও ([1:a]) কে amix ফিল্টার দিয়ে মিক্স করা হয়েছে 
-        # যাতে মূল মুভির সাউন্ড ঠিক থাকে এবং সাথে এআই ভয়েস অ্যালার্টও শোনা যায়। -shortest ব্যবহার করা হয়নি যাতে ভিডিও না কাটে।
+        # মূল মুভির অডিও এবং এআই ভয়েস একসাথে মিক্স করা হচ্ছে যাতে লেন্স বা সাইজ না কাটে
         ffmpeg_command = [
             "ffmpeg", "-y",
             "-i", input_path,
             "-i", audio_path,
-            "-filter_complex", "[0:a]volume=1.0[a0];[1:a]volume=0.8[a1];[a0][a1] amix=inputs=2:duration=first:dropout_transition=2 [a]",
+            "-filter_complex", "[0:a]volume=1.0[a0];[1:a]volume=0.9[a1];[a0][a1] amix=inputs=2:duration=longest:dropout_transition=2 [a]",
             "-vf", "hflip,hue=h=12:s=1.15",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-pix_fmt", "yuv420p",
@@ -59,7 +56,7 @@ async def process_video(
         
         if process.returncode != 0:
             error_message = process.stderr.decode('utf-8', errors='ignore')
-            raise HTTPException(status_code=500, detail=f"FFmpeg Full Length Mixing Error: {error_message}")
+            raise HTTPException(status_code=500, detail=f"FFmpeg Processing Error: {error_message}")
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             raise HTTPException(status_code=500, detail="Processed video was not generated properly.")
