@@ -1,11 +1,21 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import subprocess
 import os
 import uuid
 from gtts import gTTS
 
 app = FastAPI(title="MovieShield AI Backend with CTA & Voice", version="2.0")
+
+# CORS Middleware Setup (নেটলিফাই বা যেকোনো ফ্রন্টএন্ড থেকে রিকোয়েস্ট এলাও করার জন্য)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 UPLOAD_DIR = "/tmp/movieshield_uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -18,7 +28,7 @@ def home():
 async def process_video(
     file: UploadFile = File(...),
     cta_text: str = Form("Watch full movie on our website!"),
-    website_url: str = Form("degreetocareers.com")
+    website_url: str = Form("virulworld.pro")
 ):
     try:
         # Save uploaded video temporarily
