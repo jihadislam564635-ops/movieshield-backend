@@ -31,13 +31,13 @@ async def process_video(
         with open(input_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Updated safe FFmpeg filter to prevent syntax errors on cloud servers
-        # Using simple hflip and standard video filters
+        # Using -pix_fmt yuv420p and libx264 to fix Windows Media Player / Films & TV encoding errors
         ffmpeg_command = [
             "ffmpeg", "-y", "-i", input_path,
-            "-vf", "hflip,colorbalance=rs=0.1:gs=0.1:bs=0.1",
+            "-vf", "hflip",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-an",  # Muting original audio temporarily to avoid stream map mismatches
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k",
             output_path
         ]
 
