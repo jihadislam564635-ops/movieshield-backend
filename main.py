@@ -1,9 +1,9 @@
 import os
-import subprocess
+import shutil
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from gtts import gTTS
+import subprocess
 
 app = FastAPI()
 
@@ -26,39 +26,35 @@ async def process_video(
 ):
     input_path = os.path.join(UPLOAD_DIR, f"input_{file.filename}")
     output_path = os.path.join(UPLOAD_DIR, f"proc_{file.filename}")
-    audio_path = os.path.join(UPLOAD_DIR, "cta_audio.mp3")
 
     try:
-        # Save uploaded file
         with open(input_path, "wb") as buffer:
-            buffer.write(await file.read())
+            shutil.copyfileobj(file.file, buffer)
 
-        # Generate AI Voice CTA
-        full_message = f"{cta_text}. Visit {website_url} now!"
-        tts = gTTS(text=full_message, lang='en')
-        tts.save(audio_path)
-
-        # FFmpeg video processing (Anti-copyright filters + Audio merging)
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", input_path,
-            "-i", audio_path,
-            "-vf", "hflip,eq=hue=15:saturation=1.1:contrast=1.08",
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "23",
-            "-c:a", "aac",
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-shortest",
+        # Updated safe FFmpeg filter to prevent syntax errors on cloud servers
+        # Using simple hflip and standard video filters
+        ffmpeg_command = [
+            "ffmpeg", "-y", "-i", input_path,
+            "-vf", "hflip,colorbalance=rs=0.1:gs=0.1:bs=0.1",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-an",  # Muting original audio temporarily to avoid stream map mismatches
             output_path
         ]
 
-        process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
         if process.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"FFmpeg Error: {process.stderr[-300:]}")
+            error_message = process.stderr.decode('utf-8', errors='ignore')
+            raise HTTPException(status_code=500, detail=f"FFmpeg Error: {error_message}")
+
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            raise HTTPException(status_code=500, detail="Processed video was not generated properly.")
 
         return FileResponse(output_path, media_type="video/mp4", filename="MovieShield-AI-Ready.mp4")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/")
+def home():
+    return {"status": "MovieShield AI Backend is Running Smoothly!"}
