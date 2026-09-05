@@ -38,19 +38,20 @@ async def process_video(
         tts = gTTS(text=full_message, lang='en', slow=False)
         tts.save(audio_path)
 
-        # ২. FFmpeg দিয়ে ভিডিওর ভিজ্যুয়াল ফিল্টার এবং এআই ভয়েস অডিও একসাথে মিক্স করা
-        # এখানে -pix_fmt yuv420p ও libx264 ব্যবহার করা হয়েছে যাতে উইন্ডোজ বা যেকোনো প্লেয়ারে চলে
+        # ২. FFmpeg দিয়ে মূল ভিডিওর ফুল লেন্স এবং অডিও বজায় রেখে ব্যাকগ্রাউন্ডে এআই ভয়েস মিক্স করা
+        # এখানে মূল ভিডিওর অডিও ([0:a]) এবং এআই ভয়েস অডিও ([1:a]) কে amix ফিল্টার দিয়ে মিক্স করা হয়েছে 
+        # যাতে মূল মুভির সাউন্ড ঠিক থাকে এবং সাথে এআই ভয়েস অ্যালার্টও শোনা যায়। -shortest ব্যবহার করা হয়নি যাতে ভিডিও না কাটে।
         ffmpeg_command = [
             "ffmpeg", "-y",
             "-i", input_path,
             "-i", audio_path,
-            "-vf", "hflip",
+            "-filter_complex", "[0:a]volume=1.0[a0];[1:a]volume=0.8[a1];[a0][a1] amix=inputs=2:duration=first:dropout_transition=2 [a]",
+            "-vf", "hflip,hue=h=12:s=1.15",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k",
             "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-shortest",
+            "-map", "[a]",
+            "-ac", "2",
             output_path
         ]
 
@@ -58,16 +59,16 @@ async def process_video(
         
         if process.returncode != 0:
             error_message = process.stderr.decode('utf-8', errors='ignore')
-            raise HTTPException(status_code=500, detail=f"FFmpeg Audio Muxing Error: {error_message}")
+            raise HTTPException(status_code=500, detail=f"FFmpeg Full Length Mixing Error: {error_message}")
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-            raise HTTPException(status_code=500, detail="Processed video with AI voice was not generated properly.")
+            raise HTTPException(status_code=500, detail="Processed video was not generated properly.")
 
-        return FileResponse(output_path, media_type="video/mp4", filename="MovieShield-AI-Ready.mp4")
+        return FileResponse(output_path, media_type="video/mp4", filename="MovieShield-AI-Protected.mp4")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 def home():
-    return {"status": "MovieShield AI Backend with AI Voice is Running Smoothly!"}
+    return {"status": "MovieShield AI Professional Backend is Running Smoothly!"}
