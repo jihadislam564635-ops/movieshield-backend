@@ -1,10 +1,10 @@
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import subprocess
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-import subprocess
-from gtts import gTTS
+import uuid
 
 app = FastAPI()
 
@@ -16,56 +16,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "/tmp/movieshield_uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+TEMP_DIR = "/tmp/movieshield"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+@app.get("/")
+def home():
+    return {"status": "MovieShield AI Pro Backend is 100% Ready!"}
 
 @app.post("/process-video/")
 async def process_video(
     file: UploadFile = File(...),
-    cta_text: str = Form(...),
-    website_url: str = Form(...)
+    cta_text: str = Form("Watch full movie on our website!"),
+    website_url: str = Form("virulworld.pro")
 ):
-    input_path = os.path.join(UPLOAD_DIR, f"input_{file.filename}")
-    audio_path = os.path.join(UPLOAD_DIR, "cta_voice.mp3")
-    output_path = os.path.join(UPLOAD_DIR, f"proc_{file.filename}")
+    unique_id = str(uuid.uuid4())[:8]
+    input_path = os.path.join(TEMP_DIR, f"input_{unique_id}.mp4")
+    output_path = os.path.join(TEMP_DIR, f"output_{unique_id}.mp4")
 
     try:
+        # Save uploaded file safely
         with open(input_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        full_message = f"{cta_text}. Visit {website_url} now!"
-        tts = gTTS(text=full_message, lang='en', slow=False)
-        tts.save(audio_path)
-
-        # Robust FFmpeg command: Keeps original movie sound, mixes AI voice seamlessly, preserves full video length, and applies mirror/color shield.
-        ffmpeg_command = [
-            "ffmpeg", "-y",
-            "-i", input_path,
-            "-i", audio_path,
-            "-filter_complex", "[0:a]volume=1.0[a0];[1:a]volume=0.8[a1];[a0][a1] amix=inputs=2:duration=first:dropout_transition=2 [a]",
-            "-vf", "hflip,hue=h=10:s=1.1",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-pix_fmt", "yuv420p",
-            "-map", "0:v:0",
-            "-map", "[a]",
-            "-ac", "2",
-            output_path
+        # Full Feature FFmpeg Command: 
+        # 1. Horizontal Mirror Flip (pHash Shield)
+        # 2. Color Tone & Hue Shift (Pixel Signature Change)
+        # 3. Audio preservation and high-compat encoding for Facebook/YouTube Monetization
+        cmd = [
+            "ffmpeg", "-i", input_path,
+            "-vf", "hflip,hue=h=15:s=1.2",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-y", output_path
         ]
 
-        process = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
         if process.returncode != 0:
-            error_message = process.stderr.decode('utf-8', errors='ignore')
-            raise HTTPException(status_code=500, detail=f"FFmpeg Error: {error_message}")
+            raise HTTPException(status_code=500, detail=f"FFmpeg Processing Error: {process.stderr[-300:]}")
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-            raise HTTPException(status_code=500, detail="Processed video was not generated properly.")
+            raise HTTPException(status_code=500, detail="Generated protected video is empty or failed.")
 
-        return FileResponse(output_path, media_type="video/mp4", filename="MovieShield-AI-Protected.mp4")
+        return FileResponse(output_path, media_type="video/mp4", filename="MovieShield-100%Safe-Ready.mp4")
 
     except Exception as e:
+        if os.path.exists(input_path): os.remove(input_path)
+        if os.path.exists(output_path): os.remove(output_path)
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/")
-def home():
-    return {"status": "MovieShield AI Professional Backend is Running Smoothly!"}
