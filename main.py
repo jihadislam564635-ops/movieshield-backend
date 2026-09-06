@@ -37,7 +37,7 @@ async def process_video(
         tts = gTTS(text=full_message, lang='en', slow=False)
         tts.save(audio_path)
 
-        # Note: duration=first preserves the full length of the source video without cutting it short.
+        # Robust FFmpeg command: Keeps original movie sound, mixes AI voice seamlessly, preserves full video length, and applies mirror/color shield.
         ffmpeg_command = [
             "ffmpeg", "-y",
             "-i", input_path,
@@ -56,7 +56,7 @@ async def process_video(
         
         if process.returncode != 0:
             error_message = process.stderr.decode('utf-8', errors='ignore')
-            raise HTTPException(status_code=500, detail=f"FFmpeg Processing Error: {error_message}")
+            raise HTTPException(status_code=500, detail=f"FFmpeg Error: {error_message}")
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             raise HTTPException(status_code=500, detail="Processed video was not generated properly.")
